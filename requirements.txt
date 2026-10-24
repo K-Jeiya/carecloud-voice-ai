@@ -1,0 +1,16 @@
+# Runtime (API + voice webhook)
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+sqlalchemy>=2.0,<2.2
+pydantic>=2.7,<3.0
+python-dotenv>=1.0,<2.0
+psycopg2-binary>=2.9,<3.0   # only used when DATABASE_URL points at PostgreSQL
+
+# Dashboard
+streamlit>=1.40,<2.0
+requests>=2.31,<3.0
+pandas>=2.0,<3.0
+
+# Tests
+pytest>=8.0,<10.0
+httpx>=0.27,<1.0            # required by FastAPI's TestClient

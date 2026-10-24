@@ -1,0 +1,17 @@
+# Render Blueprint (API only). Use an EXTERNAL PostgreSQL (e.g. Neon/Supabase free tier) for persistence:
+# Render's free web services have an ephemeral filesystem, so SQLite there would lose data on restart.
+services:
+  - type: web
+    name: carecloud-voice-ai-api
+    runtime: docker
+    plan: free            # free instances sleep when idle -> first call can be slow; see README
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL           # paste your PostgreSQL connection string in the Render dashboard
+        sync: false
+      - key: VAPI_SERVER_SECRET     # same value you put in Vapi
+        sync: false
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: API_KEY                # optional
+        sync: false
