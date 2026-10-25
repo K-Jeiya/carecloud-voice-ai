@@ -19,6 +19,8 @@ class Settings:
     seed_demo_data: bool
     api_key: str
     vapi_server_secret: str
+    vapi_public_key: str
+    vapi_assistant_id: str
     public_base_url: str
     log_level: str
 
@@ -31,4 +33,6 @@ def get_settings() -> Settings:
         vapi_server_secret=os.getenv("VAPI_SERVER_SECRET", "").strip(),
         public_base_url=os.getenv("PUBLIC_BASE_URL", "https://your-api.example.com").strip().rstrip("/"),
         log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+        vapi_public_key=os.getenv("VAPI_PUBLIC_KEY", "").strip(),
+        vapi_assistant_id=os.getenv("VAPI_ASSISTANT_ID", "").strip(),
     )

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import html
+from fastapi.responses import HTMLResponse, JSONResponse
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -82,3 +84,132 @@ def health():
     except Exception:
         logger.exception("Health check failed")
         return _error(503, "unhealthy", "Database unavailable")
+
+@app.get("/voice-ui", response_class=HTMLResponse, tags=["voice"])
+def voice_ui():
+    settings = get_settings()
+
+    if not settings.vapi_public_key or not settings.vapi_assistant_id:
+        return HTMLResponse(
+            "<h2>Voice setup incomplete</h2>"
+            "<p>Configure VAPI_PUBLIC_KEY and VAPI_ASSISTANT_ID in .env.</p>",
+            status_code=503,
+        )
+
+    public_key = html.escape(settings.vapi_public_key, quote=True)
+    assistant_id = html.escape(settings.vapi_assistant_id, quote=True)
+
+    page = """
+    <!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>CareCloud Voice Registration</title>
+      <style>
+      h1 { color: #60a5fa !important; }
+      p { color: #e5e7eb !important; }
+      #status {
+        background: #1f2937 !important;
+        color: #f9fafb !important;
+        border: 1px solid #4b5563;
+        border-radius: 8px;
+        padding: 12px;
+        min-height: 22px;
+        box-sizing: border-box;
+      }
+      button {
+        color: #ffffff;
+        font-weight: 600;
+      }
+      #stop {
+        background-color: #dc2626 !important;
+        color: #ffffff !important;
+        border: 1px solid #b91c1c !important;
+        font-weight: 700 !important;
+        opacity: 1 !important;
+      }
+      #stop:disabled {
+        background-color: #7f1d1d !important;
+        color: #ffffff !important;
+        opacity: 0.75 !important;
+        cursor: not-allowed;
+      }
+      #stop:not(:disabled):hover {
+        background-color: #b91c1c !important;
+      }
+      button:disabled {
+        color: #374151 !important;
+        opacity: 0.9 !important;
+        cursor: not-allowed;
+      }
+    </style>
+
+
+      <style>
+        body { font-family: Arial, sans-serif; max-width: 650px;
+               margin: 50px auto; padding: 20px; color: #1f2937; }
+        button { padding: 12px 18px; margin: 8px 8px 8px 0;
+                 border: 0; border-radius: 8px; cursor: pointer; }
+        #start { background: #166534; color: white; }
+        #stop { background: #e5e7eb; }
+        #status { margin-top: 20px; padding: 12px; background: #f3f4f6;
+                  border-radius: 8px; }
+      </style>
+    </head>
+    <body>
+      <h1>CareCloud Voice Registration</h1>
+      <p>This is a demonstration. Use fictional details only.
+         Do not share real personal or medical information.</p>
+      <button id="start">Start Voice Registration</button>
+      <button id="stop" disabled>End Call</button>
+      <div id="status" role="status">Ready to start.</div>
+
+      <script type="module">
+        import Vapi from "https://esm.sh/@vapi-ai/web";
+
+        const vapi = new Vapi("__PUBLIC_KEY__");
+        const assistantId = "__ASSISTANT_ID__";
+        const status = document.getElementById("status");
+        const start = document.getElementById("start");
+        const stop = document.getElementById("stop");
+
+        start.addEventListener("click", async () => {
+          start.disabled = true;
+          status.textContent = "Connecting to the assistant...";
+          try {
+            await vapi.start(assistantId);
+          } catch (error) {
+            status.textContent =
+              "Could not start the call. Check microphone permission and Vapi setup.";
+            start.disabled = false;
+          }
+        });
+
+        stop.addEventListener("click", () => vapi.stop());
+
+        vapi.on("call-start", () => {
+          status.textContent = "Call connected. You can start speaking.";
+          stop.disabled = false;
+        });
+
+        vapi.on("call-end", () => {
+          status.textContent = "Call ended.";
+          start.disabled = false;
+          stop.disabled = true;
+        });
+
+        vapi.on("error", () => {
+          status.textContent =
+            "Voice error. Check browser microphone permission and Vapi configuration.";
+          start.disabled = false;
+          stop.disabled = true;
+        });
+      </script>
+    </body>
+    </html>
+    """
+
+    page = page.replace("__PUBLIC_KEY__", public_key)
+    page = page.replace("__ASSISTANT_ID__", assistant_id)
+    return HTMLResponse(page)

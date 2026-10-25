@@ -6,6 +6,12 @@ Config comes from environment variables or Streamlit secrets:
 """
 from __future__ import annotations
 
+import json
+import streamlit.components.v1 as components
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
@@ -74,9 +80,17 @@ def parse_dt(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+st.markdown("""<style>
+input::placeholder {
+    color: #9ca3af !important;
+    opacity: 1 !important;
+}
+</style>""", unsafe_allow_html=True)
+
 st.set_page_config(page_title="Patient Registry (Demo)", page_icon="🩺", layout="wide")
 st.title("🩺 Patient Registry")
 st.warning("Demonstration system. Use SYNTHETIC data only - never enter real patient information.")
+
 
 if "refresh" not in st.session_state:
     st.session_state.refresh = 0
@@ -109,7 +123,11 @@ m2.metric("Registered last 7 days", sum(1 for p in patients if parse_dt(p["creat
 m3.metric("With insurance info", sum(1 for p in patients if p.get("insurance_provider")))
 m4.metric("With emergency contact", sum(1 for p in patients if p.get("emergency_contact_name")))
 
-tab_list, tab_form = st.tabs(["📋 Patients", "➕ Create / ✏️ Update"])
+tab_list, tab_form, tab_voice = st.tabs([
+    "📋 Patients",
+    "➕ Create / ✏️ Update",
+    "🎙️ Voice Registration",
+])
 
 # ------------------------------------------------------------------ list + detail + delete
 with tab_list:
@@ -232,3 +250,116 @@ with tab_form:
             st.rerun()
         except ApiError as exc:
             st.error(str(exc))
+
+
+# ------------------------------------------------------------------
+# Voice registration — embedded inside Streamlit
+with tab_voice:
+    st.subheader("🎙️ CareCloud Voice Registration")
+    st.write(
+        "Register a demo patient by speaking with the CareCloud assistant. "
+        "Use fictional details only."
+    )
+
+    vapi_public_key = _setting("VAPI_PUBLIC_KEY")
+    vapi_assistant_id = _setting("VAPI_ASSISTANT_ID")
+
+    if not vapi_public_key or not vapi_assistant_id:
+        st.error(
+            "Voice setup incomplete. Check VAPI_PUBLIC_KEY and "
+            "VAPI_ASSISTANT_ID in your root .env file."
+        )
+    else:
+        public_key_js = json.dumps(vapi_public_key)
+        assistant_id_js = json.dumps(vapi_assistant_id)
+
+        voice_html = f"""
+        <!doctype html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {{
+              font-family: Arial, sans-serif;
+              color: #1f2937;
+              padding: 12px;
+            }}
+            button {{
+              border: 0;
+              border-radius: 8px;
+              padding: 12px 18px;
+              margin-right: 8px;
+              cursor: pointer;
+              font-size: 15px;
+            }}
+            #start {{ background: #166534; color: white; }}
+            #stop {{ background: #e5e7eb; color: #111827; }}
+            #status {{
+              margin-top: 18px;
+              padding: 14px;
+              background: #f3f4f6;
+              border-radius: 8px;
+            }}
+          </style>
+        </head>
+        <body allow="microphone">
+          <button id="start">🎙️ Start Voice Registration</button>
+          <button id="stop" disabled>End Call</button>
+          <div id="status">Ready. Click Start to begin.</div>
+
+          <script type="module">
+            import Vapi from
+              "https://esm.sh/@vapi-ai/web";
+
+            const vapi = new Vapi({public_key_js});
+            const assistantId = {assistant_id_js};
+
+            const start = document.getElementById("start");
+            const stop = document.getElementById("stop");
+            const status = document.getElementById("status");
+
+            start.addEventListener("click", async () => {{
+              start.disabled = true;
+              status.textContent = "Connecting...";
+
+              try {{
+                await vapi.start(assistantId);
+              }} catch (error) {{
+                status.textContent =
+                  "Could not connect. Check microphone permission and Vapi setup.";
+                start.disabled = false;
+              }}
+            }});
+
+            stop.addEventListener("click", () => vapi.stop());
+
+            vapi.on("call-start", () => {{
+              status.textContent =
+                "Connected! Speak to the CareCloud assistant.";
+              stop.disabled = false;
+            }});
+
+            vapi.on("call-end", () => {{
+              status.textContent =
+                "Call ended. Refresh the Patients tab to see new records.";
+              start.disabled = false;
+              stop.disabled = true;
+            }});
+
+            vapi.on("error", () => {{
+              status.textContent =
+                "Voice error. Check microphone permission and Vapi configuration.";
+              start.disabled = false;
+              stop.disabled = true;
+            }});
+          </script>
+        </body>
+        </html>
+        """
+
+        components.iframe(f"{API_BASE}/voice-ui", height=420, scrolling=False)
+
+        st.info(
+            "After the call ends, click Refresh in the sidebar to load "
+            "the latest registration."
+        )
