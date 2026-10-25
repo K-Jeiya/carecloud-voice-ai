@@ -34,7 +34,10 @@ def _setting(name: str, default: str = "") -> str:
     return os.getenv(name, default)
 
 
-API_BASE = _setting("API_BASE_URL", "http://localhost:8000").rstrip("/")
+API_BASE = _setting(
+    "API_BASE_URL",
+    "https://carecloud-voice-ai.hostless.app"
+).rstrip("/")
 API_KEY = _setting("DASHBOARD_API_KEY")
 
 
