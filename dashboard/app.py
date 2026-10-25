@@ -123,6 +123,12 @@ with st.sidebar:
 
 try:
     with st.spinner("Loading patients..."):
+        if "applied_filters" not in st.session_state:
+            st.session_state.applied_filters = {
+                "last_name": "",
+                "dob": "",
+                "phone": "",
+            }
         filters = st.session_state.applied_filters
         patients = fetch_patients("", "", "", st.session_state.refresh)
 except ApiError as exc:
