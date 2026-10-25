@@ -5,6 +5,7 @@ Config comes from environment variables or Streamlit secrets:
   DASHBOARD_API_KEY  only needed if the API has API_KEY set
 """
 from __future__ import annotations
+from datetime import datetime
 
 import json
 import streamlit.components.v1 as components
@@ -61,7 +62,22 @@ def api(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
 
 @st.cache_data(ttl=10, show_spinner=False)
 def fetch_patients(last_name: str, dob: str, phone: str, refresh_token: int) -> list[dict[str, Any]]:
-    params = {k: v for k, v in {"last_name": last_name, "date_of_birth": dob, "phone_number": phone}.items() if v}
+    dob_api = ""
+    if dob:
+        try:
+            dob_api = datetime.strptime(dob, "%m/%d/%Y").strftime("%Y-%m-%d")
+        except ValueError:
+            raise ApiError("Enter DOB in MM/DD/YYYY format, e.g. 01/04/1990.")
+
+    params = {
+        k: v
+        for k, v in {
+            "last_name": last_name,
+            "date_of_birth": dob_api,
+            "phone_number": phone,
+        }.items()
+        if v
+    }
     rows: list[dict[str, Any]] = []
     offset = 0
     while True:  # page through everything (max 1000 rows for the demo)
