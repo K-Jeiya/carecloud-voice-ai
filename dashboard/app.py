@@ -114,19 +114,73 @@ if "flash" in st.session_state:
     st.success(st.session_state.pop("flash"))
 
 # ------------------------------------------------------------------ sidebar: filters + refresh
+if "applied_filters" not in st.session_state:
+    st.session_state.applied_filters = {"last_name": "", "dob": "", "phone": ""}
+if "filter_error" not in st.session_state:
+    st.session_state.filter_error = ""
+
 with st.sidebar:
     st.header("Filters")
-    f_last = st.text_input("Last name contains")
-    f_dob = st.text_input("Date of birth", placeholder="MM/DD/YYYY")
-    f_phone = st.text_input("Phone number", placeholder="(202) 555-0101")
-    if st.button("🔄 Refresh", use_container_width=True):
+    with st.form("patient_filter_form"):
+        f_last = st.text_input(
+            "Last name contains",
+            value=st.session_state.applied_filters["last_name"],
+        )
+        f_dob = st.text_input(
+            "Date of birth",
+            value=st.session_state.applied_filters["dob"],
+            placeholder="MM/DD/YYYY",
+        )
+        f_phone = st.text_input(
+            "Phone number",
+            value=st.session_state.applied_filters["phone"],
+            placeholder="(202) 555-0101",
+        )
+        search_clicked = st.form_submit_button("?? Search", use_container_width=True)
+
+    if search_clicked:
+        dob_valid = True
+        if f_dob.strip():
+            try:
+                datetime.strptime(f_dob.strip(), "%m/%d/%Y")
+            except ValueError:
+                dob_valid = False
+
+        if dob_valid:
+            st.session_state.applied_filters = {
+                "last_name": f_last.strip(),
+                "dob": f_dob.strip(),
+                "phone": f_phone.strip(),
+            }
+            st.session_state.filter_error = ""
+        else:
+            st.session_state.filter_error = (
+                "DOB format galat hai. MM/DD/YYYY use karo, example: 01/04/1990."
+            )
+
+    if st.session_state.filter_error:
+        st.error(st.session_state.filter_error)
+
+    if st.button("? Clear filters", use_container_width=True):
+        st.session_state.applied_filters = {"last_name": "", "dob": "", "phone": ""}
+        st.session_state.filter_error = ""
+        st.rerun()
+
+    if st.button("?? Refresh", use_container_width=True):
         st.session_state.refresh += 1
         st.rerun()
+
     st.caption(f"API: {API_BASE}")
 
 try:
     with st.spinner("Loading patients..."):
-        patients = fetch_patients(f_last.strip(), f_dob.strip(), f_phone.strip(), st.session_state.refresh)
+        filters = st.session_state.applied_filters
+        patients = fetch_patients(
+            filters["last_name"],
+            filters["dob"],
+            filters["phone"],
+            st.session_state.refresh,
+        )
 except ApiError as exc:
     st.error(str(exc))
     st.stop()
